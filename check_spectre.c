@@ -83,6 +83,7 @@ static int is_harmless(struct expression *expr)
 			break;
 	}
 
+	// Is the parent statement an if?
 	stmt = expr_get_parent_stmt(parent);
 	if (!stmt)
 		return 0;
@@ -155,6 +156,9 @@ static unsigned long long get_mask(struct expression *expr)
 	return ULLONG_MAX;
 }
 
+// Eliminates everything that is not an array access
+// and not fillable with user controlled data. That is all
+// the first part of check_spectre does. 
 static void array_check(struct expression *expr)
 {
 	struct expression_list *conditions;
@@ -163,6 +167,7 @@ static void array_check(struct expression *expr)
 	int array_size;
 	char *name;
 
+	// Check this is an array, and is a possible path
 	expr = strip_expr(expr);
 	if (!is_array(expr))
 		return;
@@ -172,14 +177,17 @@ static void array_check(struct expression *expr)
 	if (is_harmless(expr))
 		return;
 
+	// Gets base pointer of array
 	array_expr = get_array_base(expr);
 	if (suppress_multiple && is_ignored_expr(my_id, array_expr)) {
 		set_spectre_first_half(expr);
 		return;
 	}
 
+	// This is the index variable
 	offset = get_array_offset(expr);
 	switch(analyzed_data_type) {
+		// Is the data user-controlled?
 		case USER_DATA_TYPE:
 			if (!is_user_rl(offset))
 				return;
@@ -209,6 +217,8 @@ static void array_check(struct expression *expr)
 	conditions = get_conditions(offset);
 
 	name = expr_to_str(array_expr);
+	// This doesn't matter too much -- just says that there
+	// is an array access after an if-statement
 	sm_warning("potential spectre issue '%s' [%s]%s",
 	       name,
 	       is_read(expr) ? "r" : "w",
@@ -231,5 +241,6 @@ void check_spectre(int id)
 	if (option_project != PROJ_KERNEL)
 		return;
 
+	// Whenever operation happens, array_check will be called
 	add_hook(&array_check, OP_HOOK);
 }

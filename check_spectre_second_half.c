@@ -93,6 +93,7 @@ static void match_done(struct expression *expr)
 	if (!state)
 		return;
 
+	// Is this a check for speculation window size?
 	if (get_stmt_cnt() - (long)state->data > MAX_SPEC_STMT)
 		return;
 
