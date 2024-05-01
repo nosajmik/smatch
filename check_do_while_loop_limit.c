@@ -26,12 +26,12 @@ static void double_deref_in_iter(struct expression *expr)
 
 	// Get the complete conditional expression, not just
 	// the variable it is conditioned on.
-	struct expression *parent_expr;
+	struct expression *parent_expr = NULL;
 	parent_expr = expr_get_parent_expr(expr);
 
 	// Parent expression must be a single comparison, so this rules
 	// out for-loops (they would be compound).
-	if (parent_expr->type != EXPR_COMPARE)
+	if (!parent_expr || parent_expr->type != EXPR_COMPARE)
 		return;
 
 	// Try to find the name of the loop variable. Usually,
