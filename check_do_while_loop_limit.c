@@ -28,7 +28,23 @@ static void double_deref_in_iter(struct expression *expr)
 	// the variable it is conditioned on.
 	struct expression *parent_expr;
 	parent_expr = expr_get_parent_expr(expr);
-	// printf("%s\n", expr_to_str(parent_expr));
+
+	// Parent expression must be a single comparison, so this rules
+	// out for-loops (they would be compound).
+	if (parent_expr->type != EXPR_COMPARE)
+		return;
+
+	// Try to find the name of the loop variable. Usually,
+	// code standards put it on the left hand side of the loop
+	// expression, but check the right afterwards. Return if the
+	// name can't be found.
+	char *loop_var_name = NULL;
+	if (parent_expr->left->type == EXPR_SYMBOL)
+		loop_var_name = parent_expr->left->symbol_name->name;
+	else if (parent_expr->right->type == EXPR_SYMBOL)
+		loop_var_name = parent_expr->right->symbol_name->name;
+	if (!loop_var_name)
+		return;
 
 	// Get the cond expr as a statement. The built in functions
 	// contain null checks, so we just need to check stmt.
@@ -43,34 +59,70 @@ static void double_deref_in_iter(struct expression *expr)
 
 	// Loop over each line of code in the loop body.
 	struct statement *tmp;
-	FOR_EACH_PTR(stmt->iterator_statement->stmts, tmp) {
+	FOR_EACH_PTR(stmt->iterator_statement->stmts, tmp)
+	{
 		// We look for declarations coming from a double pointer deref.
-		if (tmp->type == STMT_DECLARATION) {
+		if (tmp->type == STMT_DECLARATION)
+		{
 			struct symbol *sym;
 
 			// In the RHS of the declaration, we iterate over the symbols.
-			FOR_EACH_PTR(tmp->declaration, sym) {
-				if (sym->namespace == NS_SYMBOL) {
+			FOR_EACH_PTR(tmp->declaration, sym)
+			{
+				if (sym->namespace == NS_SYMBOL)
+				{
 					// Detect if there is the first dereference. 42 is ASCII for *.
-					if (sym->initializer->type == EXPR_PREOP) {
-						if (sym->initializer->op == 42) {
+					if (sym->initializer->type == EXPR_PREOP)
+					{
+						if (sym->initializer->op == 42)
+						{
 							// Detect if there is the second deref.
-							if (sym->initializer->unop->type == EXPR_PREOP) {
-								if (sym->initializer->unop->op == 42) {
-									sm_warning("found double pointer deref in iterating loop: %s", expr_to_str(sym->initializer));
+							if (sym->initializer->unop->type == EXPR_PREOP)
+							{
+								if (sym->initializer->unop->op == 42)
+								{
+									sm_warning("found double pointer deref in while loop: %s", expr_to_str(sym->initializer));
 								}
 							}
 						}
-						
 					}
 				}
-			} END_FOR_EACH_PTR(sym);
+			}
+			END_FOR_EACH_PTR(sym);
 		}
-		else if (tmp->type == STMT_EXPRESSION) {
-			// printf("expression: %s\n", expr_to_str(tmp->expression));
-			// printf("op: %c\n", tmp->expression->op);
+		else if (tmp->type == STMT_EXPRESSION)
+		{
+			// Look for assignment to loop variable.
+			if (tmp->expression->type == EXPR_ASSIGNMENT)
+			{
+				// Check that assigned variable on the left is the loop var.
+				if (tmp->expression->left->type == EXPR_SYMBOL)
+				{
+					if (strcmp(tmp->expression->left->symbol_name->name, loop_var_name) == 0)
+					{
+						// Loop var has been reassigned. Is a deref on the right?
+						// This is characteristic of a linked list traversal.
+						if (tmp->expression->right->type == EXPR_DEREF)
+						{
+							if (tmp->expression->right->deref->type == EXPR_PREOP)
+							{
+								// Is the deref from the loop var itself? This
+								// looks for assignment to the 'next' pointer.
+								if (tmp->expression->right->deref->unop->type == EXPR_SYMBOL)
+								{
+									if (strcmp(tmp->expression->right->deref->unop->symbol_name->name, loop_var_name) == 0)
+									{
+										sm_warning("found pointer chasing in loop variable (linked list traversal): %s", expr_to_str(tmp->expression));
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
-	} END_FOR_EACH_PTR(tmp);
+	}
+	END_FOR_EACH_PTR(tmp);
 }
 
 void check_do_while_loop_limit(int id)
