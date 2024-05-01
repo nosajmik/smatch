@@ -16,52 +16,67 @@
  */
 
 #include "smatch.h"
-#include "smatch_slist.h"
 #include "smatch_extra.h"
 
 static int my_id;
 
-STATE(post_minus);
-
-static bool is_post_minus(struct expression *expr)
+static void double_deref_in_iter(struct expression *expr)
 {
 	expr = strip_expr(expr);
-	if (!expr)
-		return false;
-	if (expr->type != EXPR_POSTOP)
-		return false;
-	if (expr->op != SPECIAL_DECREMENT)
-		return false;
-	return true;
-}
 
-static void match_post_loop(struct expression *expr)
-{
+	// Get the complete conditional expression, not just
+	// the variable it is conditioned on.
+	struct expression *parent_expr;
+	parent_expr = expr_get_parent_expr(expr);
+	// printf("%s\n", expr_to_str(parent_expr));
+
+	// Get the cond expr as a statement. The built in functions
+	// contain null checks, so we just need to check stmt.
 	struct statement *stmt;
+	stmt = expr_get_parent_stmt(parent_expr);
 
-	expr = strip_expr(expr);
-	stmt = expr_get_parent_stmt(expr);
-
+	// Check that it is a while- or for-loop using an iterator.
 	if (!stmt)
 		return;
 	if (stmt->type != STMT_ITERATOR)
 		return;
-	if (!is_post_minus(stmt->iterator_post_condition))
-		return;
-	if (is_post_minus(stmt->iterator_post_condition))
-		set_state_expr(my_id, stmt->iterator_post_condition->left, &post_minus);
-}
 
-static void match_condition(struct expression *expr)
-{
-	if (get_state_expr(my_id, expr) != &post_minus)
-		return;
-	sm_warning("do while ends on '%s == -1'", expr_to_str(expr));
+	// Loop over each line of code in the loop body.
+	struct statement *tmp;
+	FOR_EACH_PTR(stmt->iterator_statement->stmts, tmp) {
+		// We look for declarations coming from a double pointer deref.
+		if (tmp->type == STMT_DECLARATION) {
+			struct symbol *sym;
+
+			// In the RHS of the declaration, we iterate over the symbols.
+			FOR_EACH_PTR(tmp->declaration, sym) {
+				if (sym->namespace == NS_SYMBOL) {
+					// Detect if there is the first dereference. 42 is ASCII for *.
+					if (sym->initializer->type == EXPR_PREOP) {
+						if (sym->initializer->op == 42) {
+							// Detect if there is the second deref.
+							if (sym->initializer->unop->type == EXPR_PREOP) {
+								if (sym->initializer->unop->op == 42) {
+									sm_warning("found double pointer deref in iterating loop: %s", expr_to_str(sym->initializer));
+								}
+							}
+						}
+						
+					}
+				}
+			} END_FOR_EACH_PTR(sym);
+		}
+		else if (tmp->type == STMT_EXPRESSION) {
+			// printf("expression: %s\n", expr_to_str(tmp->expression));
+			// printf("op: %c\n", tmp->expression->op);
+		}
+	} END_FOR_EACH_PTR(tmp);
 }
 
 void check_do_while_loop_limit(int id)
 {
+	// Hook is called every time there is a conditional
+	// statement in the source code.
 	my_id = id;
-	add_hook(&match_post_loop, CONDITION_HOOK);
-	add_hook(&match_condition, CONDITION_HOOK);
+	add_hook(&double_deref_in_iter, CONDITION_HOOK);
 }
