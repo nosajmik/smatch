@@ -113,8 +113,8 @@ void check_spectre_second_half(int id)
 {
 	my_id = id;
 
-	if (option_project != PROJ_KERNEL)
-		return;
+	// if (option_project != PROJ_KERNEL)
+	// 	return;
 	add_function_data((unsigned long *)&first_halfs);
 	set_dynamic_states(my_id);
 	add_hook(&match_assign, ASSIGNMENT_HOOK);

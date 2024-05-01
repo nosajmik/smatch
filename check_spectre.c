@@ -161,6 +161,7 @@ static unsigned long long get_mask(struct expression *expr)
 // the first part of check_spectre does. 
 static void array_check(struct expression *expr)
 {
+	// printf("array_check called\n");
 	struct expression_list *conditions;
 	struct expression *array_expr, *offset;
 	unsigned long long mask;
@@ -169,40 +170,48 @@ static void array_check(struct expression *expr)
 
 	// Check this is an array, and is a possible path
 	expr = strip_expr(expr);
+	// printf("array check\n");
 	if (!is_array(expr))
 		return;
 
+	// printf("possible path check\n");
 	if (is_impossible_path())
 		return;
+	// printf("harmless check\n");
 	if (is_harmless(expr))
 		return;
 
 	// Gets base pointer of array
 	array_expr = get_array_base(expr);
 	if (suppress_multiple && is_ignored_expr(my_id, array_expr)) {
+		// printf("set spectre 1st half\n");
 		set_spectre_first_half(expr);
 		return;
 	}
 
 	// This is the index variable
+	// printf("getting offset\n");
 	offset = get_array_offset(expr);
-	switch(analyzed_data_type) {
-		// Is the data user-controlled?
-		case USER_DATA_TYPE:
-			if (!is_user_rl(offset))
-				return;
-			break;
-		case HOST_DATA_TYPE:
-			if (!is_host_rl(offset))
-				return;
-			break;
-		default:
-			return;
-	}
+	// switch(analyzed_data_type) {
+	// 	// Is the data user-controlled?
+	// 	case USER_DATA_TYPE:
+	// 		// printf("user data type\n");
+	// 		if (!is_user_rl(offset))
+	// 			return;
+	// 		break;
+	// 	case HOST_DATA_TYPE:
+	// 		// printf("host data type\n");
+	// 		if (!is_host_rl(offset))
+	// 			return;
+	// 		break;
+	// 	default:
+	// 		return;
+	// }
 
 	if (is_nospec(offset))
 		return;
 
+	// printf("passed is_nospec\n");
 	array_size = get_array_size(array_expr);
 	if (array_size > 0 && get_max_by_type(offset) < array_size)
 		return;
@@ -232,14 +241,15 @@ static void array_check(struct expression *expr)
 
 void check_spectre(int id)
 {
+	// printf("check_spectre called\n");
 	my_id = id;
 
-	suppress_multiple = getenv("FULL_SPECTRE") == NULL;
-	if (getenv("ANALYZE_HOST_DATA"))
-		analyzed_data_type = HOST_DATA_TYPE;
+	// suppress_multiple = getenv("FULL_SPECTRE") == NULL;
+	// if (getenv("ANALYZE_HOST_DATA"))
+	// 	analyzed_data_type = HOST_DATA_TYPE;
 
-	if (option_project != PROJ_KERNEL)
-		return;
+	// if (option_project != PROJ_KERNEL)
+	// 	return;
 
 	// Whenever operation happens, array_check will be called
 	add_hook(&array_check, OP_HOOK);
