@@ -2415,7 +2415,7 @@ void init_include_path(void)
 	char arch[32];
 	char os[32];
 
-	fp = popen("/bin/uname -m", "r");
+	fp = popen("/usr/bin/uname -m", "r");
 	if (!fp)
 		return;
 	if (!fgets(arch, sizeof(arch) - 1, fp))
@@ -2424,17 +2424,17 @@ void init_include_path(void)
 	if (arch[strlen(arch) - 1] == '\n')
 		arch[strlen(arch) - 1] = '\0';
 
-	fp = popen("/bin/uname -o", "r");
+	fp = popen("/usr/bin/uname -o", "r");
 	if (!fp)
 		return;
 	fgets(os, sizeof(os) - 1, fp);
 	pclose(fp);
 
-	if (strcmp(os, "GNU/Linux\n") != 0)
-		return;
-	strcpy(os, "linux-gnu");
+	// if (strcmp(os, "GNU/Linux\n") != 0)
+	// 	return;
+	// strcpy(os, "linux-gnu");
 
-	snprintf(path, sizeof(path), "/usr/include/%s-%s/", arch, os);
+	snprintf(path, sizeof(path), "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/");
 	add_pre_buffer("#add_system \"%s/\"\n", path);
 }
 
