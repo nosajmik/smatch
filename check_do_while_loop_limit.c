@@ -20,6 +20,25 @@
 
 static int my_id;
 
+static int findSubstring(const char *str, const char *sub) {
+    int len_str = strlen(str);
+    int len_sub = strlen(sub);
+	int occurrences = 0;
+
+    for (int i = 0; i <= len_str - len_sub; i++) {
+        int j;
+        for (j = 0; j < len_sub; j++) {
+            if (str[i + j] != sub[j])
+                break;
+        }
+        if (j == len_sub) {
+            ++occurrences;
+        }
+    }
+
+	return occurrences;
+}
+
 static void double_deref_in_iter(struct expression *expr)
 {
 	expr = strip_expr(expr);
@@ -81,7 +100,7 @@ static void double_deref_in_iter(struct expression *expr)
 							{
 								if (sym->initializer->unop->op == 42)
 								{
-									sm_warning("found double pointer deref in while loop: %s", expr_to_str(sym->initializer));
+									sm_warning("found pointer double deref in while loop (assign to **): %s", expr_to_str(sym->initializer));
 								}
 							}
 						}
@@ -119,6 +138,20 @@ static void double_deref_in_iter(struct expression *expr)
 						}
 					}
 				}
+			}
+
+			// Naive string search for double deref.
+			const char *expr_str = expr_to_str(tmp->expression);
+			const char *result = strstr(expr_str, "**");
+			if (result != NULL)
+			{
+				sm_warning("found pointer double deref in while loop (**): %s", expr_to_str(tmp->expression));
+			}
+
+			// Naive search for double -> deref.
+			if (findSubstring(expr_str, "->") > 1)
+			{
+				sm_warning("found pointer double deref in while loop (->->): %s", expr_to_str(tmp->expression));
 			}
 		}
 	}
