@@ -24,7 +24,7 @@ void traverseList(Node *head) {
     Node *current = head;
     while (current != NULL) {
         printf("%d\n", **(current->data));
-        current = current->next;
+        current = current->next->next;
     }
 }
 

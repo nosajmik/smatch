@@ -17,27 +17,9 @@
 
 #include "smatch.h"
 #include "smatch_extra.h"
+#include <regex.h>
 
 static int my_id;
-
-static int findSubstring(const char *str, const char *sub) {
-    int len_str = strlen(str);
-    int len_sub = strlen(sub);
-	int occurrences = 0;
-
-    for (int i = 0; i <= len_str - len_sub; i++) {
-        int j;
-        for (j = 0; j < len_sub; j++) {
-            if (str[i + j] != sub[j])
-                break;
-        }
-        if (j == len_sub) {
-            ++occurrences;
-        }
-    }
-
-	return occurrences;
-}
 
 static void double_deref_in_iter(struct expression *expr)
 {
@@ -148,11 +130,21 @@ static void double_deref_in_iter(struct expression *expr)
 				sm_warning("found pointer double deref in while loop (**): %s", expr_to_str(tmp->expression));
 			}
 
-			// Naive search for double -> deref.
-			if (findSubstring(expr_str, "->") > 1)
+			const char *pattern = "->[^,\\s]+->";
+			regex_t regex;
+			int reti = regcomp(&regex, pattern, REG_EXTENDED);
+			if (reti)
+			{
+				continue;
+			}
+
+			reti = regexec(&regex, expr_str, 0, NULL, 0);
+			if (!reti)
 			{
 				sm_warning("found pointer double deref in while loop (->->): %s", expr_to_str(tmp->expression));
 			}
+
+			regfree(&regex);
 		}
 	}
 	END_FOR_EACH_PTR(tmp);
